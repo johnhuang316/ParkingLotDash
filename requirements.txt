@@ -1,0 +1,7 @@
+dataclasses
+google-cloud-bigquery
+python-dotenv
+pandas
+dash
+dash_bootstrap_components
+dash[diskcache]
