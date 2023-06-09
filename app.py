@@ -76,31 +76,52 @@ app.layout = dbc.Container([
 @app.callback(
     Output('district-dropdown', 'options'),
     Output('district-dropdown', 'value'),
-    Input('county-dropdown', 'value'))
-def set_district_options(selected_county):
-    filter1 = df['county'] == selected_county
+    Input('county-dropdown', 'value'),
+    Input('officialid-dropdown', 'value'),
+)
+def set_district_options(county,official_id):
+    filter1 = df['county'] == county
+    if official_id is not None or "":
+        filter1 = filter1 & (df['official_id'] == official_id)
     district_list = df['district'].where(filter1).dropna().unique().tolist()
     options = [{'label': i, 'value': i}
                for i in list(filter(None, district_list))]
-    value = options[0]['value']
+    value = ''
+    if len(options)>0:
+        value = options[0]['value']
     return options, value
 
 
 @app.callback(
     Output('officialid-dropdown', 'options'),
-    Input('district-dropdown', 'value'))
-def set_district_value(selected_id):
-    filter1 = df['district'] == selected_id
-    filter2 = df['district'] is not None
-    official_list = df.where(filter1 & filter2).filter(items=['name', 'official_id']).dropna().to_dict('records')
+    Input('district-dropdown', 'value'),
+    Input('county-dropdown', 'value'),
+)
+def set_district_value(district, county):
+    filter1 = df['county'] == county
+    if district is not None or "":
+        filter1 = filter1 & (df['district'] == district) & (df['district'] is not None)
+
+    official_list = df.where(filter1).filter(items=['name', 'official_id']).dropna().to_dict('records')
+
     return [{'label': i['name'], 'value': i['official_id']} for i in official_list]
 
 
 @app.callback(
-    Output('officialid-dropdown', 'value'),
-    Input('officialid-dropdown', 'options'))
-def set_official_id_value(available_options):
-    return available_options[0]['value']
+    Output('district-dropdown', 'options', allow_duplicate=True),
+    Input('officialid-dropdown', 'value'),
+    Input('district-dropdown', 'options'),
+    prevent_initial_call=True,
+)
+def set_official_id_value(official_id,district_options):
+    if official_id is not None or "":
+        filter1 = df['official_id'] == official_id
+        district_list = df['district'].where(filter1).dropna().unique().tolist()
+        options = [{'label': i, 'value': i}
+               for i in list(filter(None, district_list))]
+    else:
+        options = district_options
+    return options
 
 
 @app.callback(
@@ -116,7 +137,10 @@ def set_display_children(selected_county, selected_district, selected_official_i
     filter1 = df['county'] == selected_county
     filter2 = df['district'] == selected_district
     filter3 = df['official_id'] == selected_official_id
-    parking_lot = df.where(filter1 & filter2 & filter3).dropna().to_dict('records')[0]
+    parking_lot = df.where(filter1 & filter2 & filter3).dropna().to_dict('records')
+    if len(parking_lot) == 0:
+        return '','','','',''
+    parking_lot = parking_lot[0]
     total_spaces_string = f"""
     小客車:{parking_lot['total_parking_spaces']}
     \n
