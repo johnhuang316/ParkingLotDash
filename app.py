@@ -8,13 +8,13 @@ import diskcache
 import plotly.express as px
 
 
-
 load_dotenv()
 cache = diskcache.Cache("./cache")
 long_callback_manager = DiskcacheLongCallbackManager(cache)
 storage = BigQueryStorage()
 df = pd.DataFrame(storage.get_parking_lot_data())
 app = Dash(__name__, long_callback_manager=long_callback_manager,external_stylesheets=[dbc.themes.BOOTSTRAP])
+server=app.server
 all_options = {}
 county_list = df['county'].dropna().unique().tolist()
 

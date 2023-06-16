@@ -1,6 +1,6 @@
 import os
 import string
-from datetime import datetime
+import datetime
 from dataclasses import dataclass
 from typing import List
 from google.cloud import bigquery
@@ -61,10 +61,12 @@ class BigQueryStorage():
 
         query_job = self.client.query(query, job_config)
         data = []
+        t = datetime.timezone(datetime.timedelta(hours=8))
         for row in query_job:
+            time = row.time
             data.append(
                 TimeParkingAvailability(
-                    time=row.time,
+                    time=time.astimezone(t),
                     remaining_parking_spaces=row.remaining_parking_spaces,
                     remaining_motorcycle_spaces=row.remaining_motorcycle_spaces,
                     remaining_charging_stations=row.remaining_charging_stations

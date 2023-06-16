@@ -1,8 +1,8 @@
-dataclasses
-google-cloud-bigquery
-python-dotenv
-pandas
-dash
-dash_bootstrap_components
+pandas==2.0.2
+dataclasses==0.6
+google-cloud-bigquery==3.11.0
+python-dotenv==1.0.0
+dash==2.10.2
+dash_bootstrap_components==1.4.1
 dash[diskcache]
-gunicorn
+gunicorn==20.1.0
