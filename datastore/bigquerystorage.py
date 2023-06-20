@@ -66,7 +66,7 @@ class BigQueryStorage():
             time = row.time
             data.append(
                 TimeParkingAvailability(
-                    time=time.astimezone(t),
+                    time=time.astimezone(t).strftime('%Y-%m-%dT%H:%M:%S'),
                     remaining_parking_spaces=row.remaining_parking_spaces,
                     remaining_motorcycle_spaces=row.remaining_motorcycle_spaces,
                     remaining_charging_stations=row.remaining_charging_stations

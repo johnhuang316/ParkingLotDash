@@ -6,6 +6,8 @@ from datastore.bigquerystorage import BigQueryStorage
 from dash.long_callback import DiskcacheLongCallbackManager
 import diskcache
 import plotly.express as px
+import dash
+import numpy as np
 
 
 load_dotenv()
@@ -14,15 +16,45 @@ long_callback_manager = DiskcacheLongCallbackManager(cache)
 storage = BigQueryStorage()
 df = pd.DataFrame(storage.get_parking_lot_data())
 app = Dash(__name__, long_callback_manager=long_callback_manager,external_stylesheets=[dbc.themes.BOOTSTRAP])
-server=app.server
+# server=app.server
 all_options = {}
 county_list = df['county'].dropna().unique().tolist()
 
 
 graph=html.Div([
-    dcc.Graph(
-        id='time-remaining',
-    )
+    dcc.Store(id='data-storage'),
+    dcc.Dropdown(
+        id='group-time',
+        options=[
+            {'label': '不分組', 'value': 'NO'},
+            {'label': '小時', 'value': 'H'},
+            {'label': '星期', 'value': 'W'},
+            {'label': '星期小時', 'value': 'WH'},
+            {'label': '平日假日小時', 'value': 'WDH'}
+        ],
+        value='NO'
+    ),
+    dcc.Dropdown(
+        id='calc-method',
+        options=[
+            {'label': '平均', 'value': 'mean'},
+            {'label': '最大', 'value': 'max'},
+            {'label': '最小', 'value': 'min'}
+        ],
+        value='mean'
+    ),
+    dcc.Dropdown(
+        id='chart-type',
+        options=[
+            {'label': '折線圖', 'value': 'line'},
+            {'label': '長條圖', 'value': 'bar'},
+            {'label': '箱型圖', 'value': 'box'},
+            {'label': '散點圖', 'value': 'scatter'},
+            {'label': '熱圖', 'value': 'heatmap'}
+        ],
+        value='line'
+    ),
+    dcc.Graph(id='graph')
 ])
 
 info_card = dbc.Card(
@@ -151,11 +183,7 @@ def set_display_children(selected_county, selected_district, selected_official_i
     return parking_lot['name'],parking_lot['official_id'],f"地址:{parking_lot['address']}",total_spaces_string,parking_lot['description']
 
 @app.long_callback(
-    output =[
-        Output('tbl', 'data'),
-        Output('tbl', 'columns'),
-        Output('time-remaining', 'figure'),
-    ],
+    Output('data-storage', 'data'),
     inputs=[
         Input('submit', 'n_clicks'),
         State('county-dropdown', 'value'),
@@ -168,14 +196,101 @@ def set_display_children(selected_county, selected_district, selected_official_i
     ],
     prevent_initial_call=True,
 )
-def callback(n_clicks,selected_county, selected_official_id):
+def load_data(n_clicks,selected_county, selected_official_id):
     print(n_clicks)
     data=pd.DataFrame(storage.get_parkig_time_data(selected_official_id,selected_county))
-    columns=[{'id': c, 'name': c} for c in data.columns]
-    fig = px.scatter(data, x="time", y="remaining_parking_spaces")
-    return data.to_dict('records'),columns,fig
+    return data.to_dict('records')
+
+
+@app.callback(
+    Output('graph', 'figure'),
+    Output('tbl', 'data'),
+    Output('tbl', 'columns'),
+    Input('group-time', 'value'),
+    Input('calc-method', 'value'),
+    Input('chart-type', 'value'),
+    Input('data-storage', 'data'),
+    prevent_initial_call=True
+)
+def update_graph(group_time, calc_method, chart_type, data):
+    if data is None:
+        return dash.no_update
+
+    data_frame = pd.DataFrame(data)
+    
+    columns=[{'id': c, 'name': c} for c in data_frame.columns]
+
+    data_frame['time'] = pd.to_datetime(data_frame['time'])
+
+    if group_time == 'NO':
+        data_frame['time'] = data_frame['time'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        data_frame.index = data_frame['time']
+        data_frame_grouped = data_frame
+    else:
+        # 更新分組的映射
+        group_mapping = {
+            'H': data_frame['time'].dt.hour,
+            'W': data_frame['time'].dt.dayofweek,
+            'WH': [data_frame['time'].dt.dayofweek, data_frame['time'].dt.hour],
+            'WDH': [(data_frame['time'].dt.dayofweek < 5).astype(int), data_frame['time'].dt.hour]
+        }
+        agg_mapping = {
+            'mean': np.mean,
+            'max': np.max,
+            'min': np.min
+        }
+            
+        group_key = group_mapping[group_time]
+        agg_func = agg_mapping[calc_method]
+        data_frame_grouped = data_frame.groupby(group_key)['remaining_parking_spaces'].agg(agg_func)
+        
+        if isinstance(data_frame_grouped.index, pd.MultiIndex):
+            data_frame_grouped.index = data_frame_grouped.index.to_flat_index().astype(str)
+        
+            
+        weekday_map = {
+            0: 'Monday',
+            1: 'Tuesday',
+            2: 'Wednesday',
+            3: 'Thursday',
+            4: 'Friday',
+            5: 'Saturday',
+            6: 'Sunday'
+        }
+        
+        # Convert the numeric weekday and hour labels to more human-readable ones
+        if group_time == 'H':
+            data_frame_grouped.index = data_frame_grouped.index.map(lambda x: f'{x}:00-{x+1}:00')
+        elif group_time == 'W':
+            data_frame_grouped.index = data_frame_grouped.index.map(weekday_map.get)
+        elif group_time == 'WH':
+            data_frame_grouped.index = data_frame_grouped.index.map(
+                lambda x: f"{weekday_map[int(x.strip('() ').split(',')[0])]} {x.strip('() ').split(',')[1]}:00-{int(x.strip('() ').split(',')[1])+1}:00"
+            )
+        elif group_time == 'WDH':
+            data_frame_grouped.index = data_frame_grouped.index.map(
+                lambda x: f"{'週間' if int(x.strip('() ').split(',')[0]) == 0 else '週末'} {x.strip('() ').split(',')[1]}:00-{int(x.strip('() ').split(',')[1])+1}:00"
+            )
+
+
+    chart_mapping = {
+        'line': px.line,
+        'bar': px.bar,
+        'box': px.box,
+        'scatter': px.scatter,
+        'heatmap': px.density_heatmap
+    }
+    chart_func = chart_mapping[chart_type]
+    
+        
+    if chart_type == 'heatmap':
+        fig = chart_func(data_frame_grouped, x=data_frame_grouped.index, y='remaining_parking_spaces', nbinsx=20)
+    else:
+        fig = chart_func(data_frame_grouped, x=data_frame_grouped.index, y='remaining_parking_spaces')
+        
+    return fig, data, columns
 
 
     
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port="8050", debug=False)
+    app.run(host="0.0.0.0", port="8050", debug=True)
