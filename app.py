@@ -15,13 +15,14 @@ cache = diskcache.Cache("./cache")
 long_callback_manager = DiskcacheLongCallbackManager(cache)
 storage = BigQueryStorage()
 df = pd.DataFrame(storage.get_parking_lot_data())
-app = Dash(__name__, long_callback_manager=long_callback_manager,external_stylesheets=[dbc.themes.BOOTSTRAP])
-# server=app.server
+app = Dash(__name__, long_callback_manager=long_callback_manager,
+           external_stylesheets=[dbc.themes.BOOTSTRAP])
+server = app.server
 all_options = {}
 county_list = df['county'].dropna().unique().tolist()
 
 
-graph=html.Div([
+graph = html.Div([
     dcc.Store(id='data-storage'),
     dcc.Dropdown(
         id='group-time',
@@ -60,16 +61,16 @@ graph=html.Div([
 info_card = dbc.Card(
     dbc.CardBody([
         html.H4(id='parking-lot-name', className="card-title"),
-        html.H6(id='parking-lot-id',className="card-subtitle"),
-        html.P(id='parking-lot-address',className="card-text"),
-        html.H6('總停車位數',className="card-subtitle"),
-        html.P(id='parking-lot-spaces',className="card-text"),
-        html.P(id='parking-lot-description',className="card-text")
+        html.H6(id='parking-lot-id', className="card-subtitle"),
+        html.P(id='parking-lot-address', className="card-text"),
+        html.H6('總停車位數', className="card-subtitle"),
+        html.P(id='parking-lot-spaces', className="card-text"),
+        html.P(id='parking-lot-description', className="card-text")
     ])
 )
 
 table = dash_table.DataTable(
-    page_size=10,  
+    page_size=10,
     style_cell={'textAlign': 'left', 'whiteSpace': 'normal'},
     id='tbl',
 )
@@ -89,7 +90,8 @@ dropdown_list = [
     dbc.Row(
         [
             table,
-            dbc.Spinner(color="primary",id='spinner',spinner_style={'display':'none'}),
+            dbc.Spinner(color="primary", id='spinner',
+                        spinner_style={'display': 'none'}),
         ]
     )
 ]
@@ -100,10 +102,11 @@ app.layout = dbc.Container([
         dbc.Row([
             dbc.Col(dropdown_list, width=4),
             dbc.Col(info_card),
-        ],style={"margin-bottom": "20px"}),
+        ], style={"margin-bottom": "20px"}),
         dbc.Row(graph)
     ])
 ])
+
 
 @app.callback(
     Output('district-dropdown', 'options'),
@@ -111,7 +114,7 @@ app.layout = dbc.Container([
     Input('county-dropdown', 'value'),
     Input('officialid-dropdown', 'value'),
 )
-def set_district_options(county,official_id):
+def set_district_options(county, official_id):
     filter1 = df['county'] == county
     if official_id is not None or "":
         filter1 = filter1 & (df['official_id'] == official_id)
@@ -119,7 +122,7 @@ def set_district_options(county,official_id):
     options = [{'label': i, 'value': i}
                for i in list(filter(None, district_list))]
     value = ''
-    if len(options)>0:
+    if len(options) > 0:
         value = options[0]['value']
     return options, value
 
@@ -132,9 +135,11 @@ def set_district_options(county,official_id):
 def set_district_value(district, county):
     filter1 = df['county'] == county
     if district is not None or "":
-        filter1 = filter1 & (df['district'] == district) & (df['district'] is not None)
+        filter1 = filter1 & (df['district'] == district) & (
+            df['district'] is not None)
 
-    official_list = df.where(filter1).filter(items=['name', 'official_id']).dropna().to_dict('records')
+    official_list = df.where(filter1).filter(
+        items=['name', 'official_id']).dropna().to_dict('records')
 
     return [{'label': i['name'], 'value': i['official_id']} for i in official_list]
 
@@ -145,12 +150,13 @@ def set_district_value(district, county):
     Input('district-dropdown', 'options'),
     prevent_initial_call=True,
 )
-def set_official_id_value(official_id,district_options):
+def set_official_id_value(official_id, district_options):
     if official_id is not None or "":
         filter1 = df['official_id'] == official_id
-        district_list = df['district'].where(filter1).dropna().unique().tolist()
+        district_list = df['district'].where(
+            filter1).dropna().unique().tolist()
         options = [{'label': i, 'value': i}
-               for i in list(filter(None, district_list))]
+                   for i in list(filter(None, district_list))]
     else:
         options = district_options
     return options
@@ -169,9 +175,10 @@ def set_display_children(selected_county, selected_district, selected_official_i
     filter1 = df['county'] == selected_county
     filter2 = df['district'] == selected_district
     filter3 = df['official_id'] == selected_official_id
-    parking_lot = df.where(filter1 & filter2 & filter3).dropna().to_dict('records')
+    parking_lot = df.where(
+        filter1 & filter2 & filter3).dropna().to_dict('records')
     if len(parking_lot) == 0:
-        return '','','','',''
+        return '', '', '', '', ''
     parking_lot = parking_lot[0]
     total_spaces_string = f"""
     小客車:{parking_lot['total_parking_spaces']}
@@ -180,7 +187,8 @@ def set_display_children(selected_county, selected_district, selected_official_i
     \n
     充電樁:{parking_lot['total_charging_stations']}
             """
-    return parking_lot['name'],parking_lot['official_id'],f"地址:{parking_lot['address']}",total_spaces_string,parking_lot['description']
+    return parking_lot['name'], parking_lot['official_id'], f"地址:{parking_lot['address']}", total_spaces_string, parking_lot['description']
+
 
 @app.long_callback(
     Output('data-storage', 'data'),
@@ -191,14 +199,17 @@ def set_display_children(selected_county, selected_district, selected_official_i
     ],
     running=[
         (Output("submit", "disabled"), True, False),
-        (Output("tbl", "style_table"), {'display':'none'}, {'height': '150px', 'overflowY': 'auto'}),
-        (Output("spinner", "spinner_style"), {'display':'block'}, {'display':'none'}),
+        (Output("tbl", "style_table"), {'display': 'none'}, {
+         'height': '150px', 'overflowY': 'auto'}),
+        (Output("spinner", "spinner_style"), {
+         'display': 'block'}, {'display': 'none'}),
     ],
     prevent_initial_call=True,
 )
-def load_data(n_clicks,selected_county, selected_official_id):
+def load_data(n_clicks, selected_county, selected_official_id):
     print(n_clicks)
-    data=pd.DataFrame(storage.get_parkig_time_data(selected_official_id,selected_county))
+    data = pd.DataFrame(storage.get_parkig_time_data(
+        selected_official_id, selected_county))
     return data.to_dict('records')
 
 
@@ -217,13 +228,14 @@ def update_graph(group_time, calc_method, chart_type, data):
         return dash.no_update
 
     data_frame = pd.DataFrame(data)
-    
-    columns=[{'id': c, 'name': c} for c in data_frame.columns]
+
+    columns = [{'id': c, 'name': c} for c in data_frame.columns]
 
     data_frame['time'] = pd.to_datetime(data_frame['time'])
 
     if group_time == 'NO':
-        data_frame['time'] = data_frame['time'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        data_frame['time'] = data_frame['time'].dt.strftime(
+            '%Y-%m-%d %H:%M:%S')
         data_frame.index = data_frame['time']
         data_frame_grouped = data_frame
     else:
@@ -239,15 +251,15 @@ def update_graph(group_time, calc_method, chart_type, data):
             'max': np.max,
             'min': np.min
         }
-            
+
         group_key = group_mapping[group_time]
         agg_func = agg_mapping[calc_method]
-        data_frame_grouped = data_frame.groupby(group_key)['remaining_parking_spaces'].agg(agg_func)
-        
+        data_frame_grouped = data_frame.groupby(
+            group_key)['remaining_parking_spaces'].agg(agg_func)
+
         if isinstance(data_frame_grouped.index, pd.MultiIndex):
             data_frame_grouped.index = data_frame_grouped.index.to_flat_index().astype(str)
-        
-            
+
         weekday_map = {
             0: 'Monday',
             1: 'Tuesday',
@@ -257,12 +269,14 @@ def update_graph(group_time, calc_method, chart_type, data):
             5: 'Saturday',
             6: 'Sunday'
         }
-        
+
         # Convert the numeric weekday and hour labels to more human-readable ones
         if group_time == 'H':
-            data_frame_grouped.index = data_frame_grouped.index.map(lambda x: f'{x}:00-{x+1}:00')
+            data_frame_grouped.index = data_frame_grouped.index.map(
+                lambda x: f'{x}:00-{x+1}:00')
         elif group_time == 'W':
-            data_frame_grouped.index = data_frame_grouped.index.map(weekday_map.get)
+            data_frame_grouped.index = data_frame_grouped.index.map(
+                weekday_map.get)
         elif group_time == 'WH':
             data_frame_grouped.index = data_frame_grouped.index.map(
                 lambda x: f"{weekday_map[int(x.strip('() ').split(',')[0])]} {x.strip('() ').split(',')[1]}:00-{int(x.strip('() ').split(',')[1])+1}:00"
@@ -272,7 +286,6 @@ def update_graph(group_time, calc_method, chart_type, data):
                 lambda x: f"{'週間' if int(x.strip('() ').split(',')[0]) == 0 else '週末'} {x.strip('() ').split(',')[1]}:00-{int(x.strip('() ').split(',')[1])+1}:00"
             )
 
-
     chart_mapping = {
         'line': px.line,
         'bar': px.bar,
@@ -281,16 +294,16 @@ def update_graph(group_time, calc_method, chart_type, data):
         'heatmap': px.density_heatmap
     }
     chart_func = chart_mapping[chart_type]
-    
-        
+
     if chart_type == 'heatmap':
-        fig = chart_func(data_frame_grouped, x=data_frame_grouped.index, y='remaining_parking_spaces', nbinsx=20)
+        fig = chart_func(data_frame_grouped, x=data_frame_grouped.index,
+                         y='remaining_parking_spaces', nbinsx=20)
     else:
-        fig = chart_func(data_frame_grouped, x=data_frame_grouped.index, y='remaining_parking_spaces')
-        
+        fig = chart_func(
+            data_frame_grouped, x=data_frame_grouped.index, y='remaining_parking_spaces')
+
     return fig, data, columns
 
 
-    
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port="8050", debug=True)
